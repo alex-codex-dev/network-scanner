@@ -41,3 +41,22 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+## Rust V2
+
+The experimental Rust implementation is in `rust-scanner/`. It uses the
+operating system's `ping` command and a bounded worker pool. Its defaults match
+the Python limits: 256 host addresses maximum, a one-second per-host timeout,
+and 32 concurrent workers.
+
+```sh
+cargo run --manifest-path rust-scanner/Cargo.toml -- 192.168.1.0/24
+cargo run --manifest-path rust-scanner/Cargo.toml -- 192.168.1.0/24 \
+  --timeout 2 --max-hosts 512 --concurrency 16
+```
+
+Use the Rust scanner only on networks and systems you are authorized to
+scan. A host that does not reply may still be online if ICMP is filtered or
+disabled. The Rust version performs host discovery only; it does not scan
+ports, resolve hostnames, or export results. Its tests do not require a live
+network.

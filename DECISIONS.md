@@ -14,7 +14,19 @@ Limit scans to 256 host addresses by default and require an explicit
 `--max-hosts` increase for larger networks. This makes the scope visible and
 avoids accidentally iterating a very large CIDR range.
 
-## 2026-09-29 — Keep checks sequential
+## 2026-10-02 — Use a bounded worker pool in the Rust V2
 
-Check one address at a time. Sequential execution makes the flow easy to learn
-and understand; concurrency can be considered in a later iteration.
+Keep the system `ping` utility for comparable discovery behavior and to avoid
+raw-socket privileges. Rust uses a fixed number of worker threads (default 32)
+to run at most that many ping processes concurrently. The positive
+`--concurrency` option is configurable, and `--max-hosts` defaults to the same
+256 host addresses as Python. Workers write results into a shared collection;
+the CLI sorts IPv4 addresses before printing so output order is deterministic.
+
+The implementation uses `clap` for conventional argument parsing and
+`wait-timeout` to bound ping process waits. Standard-library threads and
+synchronization keep the worker pool explicit and suitable for learning.
+Platform-specific ordinary ping flags are used; tests exercise parsing and
+address enumeration without requiring a network. An absent ping executable is
+reported as an error. Ping exit failures and timeouts mean the host is not
+reported as reachable.

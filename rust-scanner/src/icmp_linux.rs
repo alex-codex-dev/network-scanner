@@ -8,15 +8,15 @@ const ECHO_REQUEST: u8 = 8;
 const ECHO_REPLY: u8 = 0;
 
 #[derive(Debug, PartialEq, Eq)]
-struct EchoMessage {
-    kind: u8,
-    code: u8,
-    identifier: u16,
-    sequence: u16,
-    payload: Vec<u8>,
+pub(super) struct EchoMessage {
+    pub(super) kind: u8,
+    pub(super) code: u8,
+    pub(super) identifier: u16,
+    pub(super) sequence: u16,
+    pub(super) payload: Vec<u8>,
 }
 
-fn checksum(bytes: &[u8]) -> u16 {
+pub(super) fn checksum(bytes: &[u8]) -> u16 {
     let mut sum = 0_u32;
     for chunk in bytes.chunks(2) {
         let word = if chunk.len() == 2 {
@@ -32,7 +32,7 @@ fn checksum(bytes: &[u8]) -> u16 {
     !(sum as u16)
 }
 
-fn build_echo_request(identifier: u16, sequence: u16, payload: &[u8]) -> Vec<u8> {
+pub(super) fn build_echo_request(identifier: u16, sequence: u16, payload: &[u8]) -> Vec<u8> {
     let mut packet = Vec::with_capacity(8 + payload.len());
     packet.extend_from_slice(&[ECHO_REQUEST, 0, 0, 0]);
     packet.extend_from_slice(&identifier.to_be_bytes());
@@ -43,7 +43,7 @@ fn build_echo_request(identifier: u16, sequence: u16, payload: &[u8]) -> Vec<u8>
     packet
 }
 
-fn parse_echo_message(packet: &[u8]) -> io::Result<EchoMessage> {
+pub(super) fn parse_echo_message(packet: &[u8]) -> io::Result<EchoMessage> {
     if packet.len() < 8 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,

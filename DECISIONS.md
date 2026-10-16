@@ -30,3 +30,12 @@ Platform-specific ordinary ping flags are used; tests exercise parsing and
 address enumeration without requiring a network. An absent ping executable is
 reported as an error. Ping exit failures and timeouts mean the host is not
 reported as reachable.
+
+## 2026-10-16 — Select Rust V3 explicitly
+
+Keep V2 as the default CLI engine so existing invocations retain their behavior.
+Expose V3 as `--engine icmp`; on Linux it uses the existing multiplexed engine
+and a single ping socket. Both engines share CIDR validation, address
+enumeration, timeout, concurrency, output, and the explicit maximum-host limit.
+The ICMP engine reports socket errors clearly and is unavailable on non-Linux
+platforms.

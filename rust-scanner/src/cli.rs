@@ -1,17 +1,30 @@
 use std::{net::Ipv4Addr, time::Duration};
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
-use crate::discovery::{self, ScanError};
+use crate::{
+    discovery::{self, ScanError},
+    icmp_v3::{self, HostState},
+};
 
 const DEFAULT_MAX_HOSTS: usize = 256;
 const DEFAULT_CONCURRENCY: usize = 32;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+enum Engine {
+    #[default]
+    V2,
+    Icmp,
+}
 
 #[derive(Debug, Parser)]
 #[command(about = "Discover ping-responsive hosts on an authorized IPv4 network")]
 struct Arguments {
     /// IPv4 network in CIDR notation, for example 192.168.1.0/24
     network: String,
+    /// Discovery engine to use (v2 uses the system ping command; icmp uses Linux ping sockets)
+    #[arg(long, value_enum, default_value_t = Engine::V2)]
+    engine: Engine,
     /// Per-host timeout in seconds
     #[arg(long, default_value_t = 1.0, value_parser = positive_float)]
     timeout: f64,
@@ -88,13 +101,11 @@ pub fn run() -> Result<(), String> {
     println!("Scanning {network}/{prefix} ({host_count} host addresses)");
     let timeout = Duration::try_from_secs_f64(args.timeout)
         .map_err(|_| "--timeout is too large".to_owned())?;
-    let reachable = discovery::discover(network, prefix, timeout, args.concurrency).map_err(
-        |error| match error {
-            ScanError::PingNotFound => "ping command was not found".to_owned(),
-            ScanError::PingFailed => "could not start or wait for ping".to_owned(),
-            ScanError::WorkerFailed => "a discovery worker failed".to_owned(),
-        },
-    )?;
+    let reachable = match args.engine {
+        Engine::V2 => discovery::discover(network, prefix, timeout, args.concurrency)
+            .map_err(format_v2_error)?,
+        Engine::Icmp => discover_icmp(network, prefix, timeout, args.concurrency)?,
+    };
     if reachable.is_empty() {
         println!("No ping-responsive hosts found.");
     } else {
@@ -106,9 +117,59 @@ pub fn run() -> Result<(), String> {
     Ok(())
 }
 
+fn format_v2_error(error: ScanError) -> String {
+    match error {
+        ScanError::PingNotFound => "ping command was not found".to_owned(),
+        ScanError::PingFailed => "could not start or wait for ping".to_owned(),
+        ScanError::WorkerFailed => "a discovery worker failed".to_owned(),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn discover_icmp(
+    network: Ipv4Addr,
+    prefix: u8,
+    timeout: Duration,
+    concurrency: usize,
+) -> Result<Vec<Ipv4Addr>, String> {
+    let mut socket = icmp_v3::linux::PingSocket::open()
+        .map_err(|error| format!("could not open Linux ICMP ping socket: {error}"))?;
+    icmp_v3::scan(
+        &mut socket,
+        &discovery::host_addresses(network, prefix),
+        timeout,
+        concurrency,
+    )
+    .map(|results| {
+        results
+            .into_iter()
+            .filter_map(|result| (result.state == HostState::Reachable).then_some(result.address))
+            .collect()
+    })
+    .map_err(|error| match error {
+        icmp_v3::ScanError::InvalidConcurrency => "--concurrency must be positive".to_owned(),
+        icmp_v3::ScanError::TooManyHosts => "ICMP engine supports at most 65535 hosts".to_owned(),
+        icmp_v3::ScanError::Socket(error) => format!("Linux ICMP ping socket failed: {error}"),
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn discover_icmp(
+    _network: Ipv4Addr,
+    _prefix: u8,
+    _timeout: Duration,
+    _concurrency: usize,
+) -> Result<Vec<Ipv4Addr>, String> {
+    Err("--engine icmp requires Linux ping sockets".to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_args(values: &[&str]) -> Result<Arguments, clap::Error> {
+        Arguments::try_parse_from(values)
+    }
 
     #[test]
     fn accepts_network_address_and_prefix() {
@@ -130,5 +191,32 @@ mod tests {
         assert!(positive_usize("0").is_err());
         assert!(positive_float("0").is_err());
         assert!(positive_float("NaN").is_err());
+    }
+
+    #[test]
+    fn defaults_to_v2_engine() {
+        let args = parse_args(&["network-scanner", "192.0.2.0/24"]).unwrap();
+        assert_eq!(args.engine, Engine::V2);
+    }
+
+    #[test]
+    fn parses_both_engines_without_scanning() {
+        assert_eq!(
+            parse_args(&["network-scanner", "192.0.2.0/24", "--engine", "v2"])
+                .unwrap()
+                .engine,
+            Engine::V2
+        );
+        assert_eq!(
+            parse_args(&["network-scanner", "192.0.2.0/24", "--engine", "icmp"])
+                .unwrap()
+                .engine,
+            Engine::Icmp
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_engine_without_scanning() {
+        assert!(parse_args(&["network-scanner", "192.0.2.0/24", "--engine", "raw"]).is_err());
     }
 }

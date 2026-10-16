@@ -1,4 +1,4 @@
-//! Multiplexed ICMP echo engine. Kept separate from the V2 CLI backend.
+//! Multiplexed ICMP echo engine used by the explicit `--engine icmp` CLI option.
 
 use std::{
     collections::BTreeMap,

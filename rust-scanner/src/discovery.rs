@@ -19,7 +19,7 @@ pub enum ScanError {
     WorkerFailed,
 }
 
-fn host_addresses(network: Ipv4Addr, prefix: u8) -> Vec<Ipv4Addr> {
+pub(crate) fn host_addresses(network: Ipv4Addr, prefix: u8) -> Vec<Ipv4Addr> {
     let base = u32::from(network);
     let count = 1_u64 << (32 - prefix);
     let skip = usize::from(prefix < 31);

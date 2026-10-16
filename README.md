@@ -55,6 +55,17 @@ cargo run --manifest-path rust-scanner/Cargo.toml -- 192.168.1.0/24 \
   --timeout 2 --max-hosts 512 --concurrency 16
 ```
 
+Rust keeps the `v2` engine as the default. Select `--engine icmp` to use the
+Rust V3 multiplexed ICMP engine over a Linux ping socket; it uses the same CIDR,
+timeout, concurrency and `--max-hosts` options. The ICMP engine requires Linux
+and permission from the system's ping socket policy. Socket open or runtime
+errors are reported directly. On other platforms the option is rejected with
+an explanatory error.
+
+```sh
+cargo run --manifest-path rust-scanner/Cargo.toml -- 192.168.1.0/24 --engine icmp
+```
+
 Use the Rust scanner only on networks and systems you are authorized to
 scan. A host that does not reply may still be online if ICMP is filtered or
 disabled. The Rust version performs host discovery only; it does not scan

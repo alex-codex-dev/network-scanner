@@ -1,10 +1,14 @@
-//! Linux ICMP Echo over ping sockets. This module is not wired into the CLI yet.
+//! Linux ICMP Echo over ping sockets.
 
-use std::{io, mem::MaybeUninit, net::Ipv4Addr, time::Duration};
+use std::io;
 
+#[cfg(test)]
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+#[cfg(test)]
+use std::{mem::MaybeUninit, net::Ipv4Addr, time::Duration};
 
 const ECHO_REQUEST: u8 = 8;
+#[cfg(test)]
 const ECHO_REPLY: u8 = 0;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -65,10 +69,12 @@ pub(super) fn parse_echo_message(packet: &[u8]) -> io::Result<EchoMessage> {
     })
 }
 
+#[cfg(test)]
 fn open_ping_socket() -> io::Result<Socket> {
     Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::ICMPV4))
 }
 
+#[cfg(test)]
 fn echo_once(
     target: Ipv4Addr,
     identifier: u16,

@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 wait-timeout = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+socket2 = "0.6"

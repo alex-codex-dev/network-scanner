@@ -1,5 +1,8 @@
 mod cli;
 mod discovery;
+#[cfg(target_os = "linux")]
+#[allow(dead_code)] // Backend is intentionally not connected to the CLI in this increment.
+mod icmp_linux;
 
 fn main() {
     if let Err(error) = cli::run() {
